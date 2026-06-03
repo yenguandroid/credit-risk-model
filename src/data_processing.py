@@ -187,4 +187,74 @@ class DataProcessor:
         )
 
         return self.preprocessor
+# Suggested Update to data_processing.py for Task-4: RFM Analysis and Clustering
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+class RFMTargetCreator(BaseEstimator, TransformerMixin):
 
+    def __init__(self, random_state=42):
+        self.random_state = random_state
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+
+        df = X.copy()
+
+        df["TransactionStartTime"] = pd.to_datetime(
+            df["TransactionStartTime"]
+        )
+
+        snapshot_date = (
+            df["TransactionStartTime"].max()
+            + pd.Timedelta(days=1)
+        )
+
+        rfm = (
+            df.groupby("CustomerId")
+            .agg(
+                Recency=(
+                    "TransactionStartTime",
+                    lambda x: (
+                        snapshot_date -
+                        x.max()
+                    ).days
+                ),
+                Frequency=(
+                    "TransactionId",
+                    "count"
+                ),
+                Monetary=(
+                    "Amount",
+                    "sum"
+                )
+            )
+        )
+
+        scaler = StandardScaler()
+
+        rfm_scaled = scaler.fit_transform(
+            rfm
+        )
+
+        kmeans = KMeans(
+            n_clusters=3,
+            random_state=self.random_state,
+            n_init=10
+        )
+
+        rfm["cluster"] = kmeans.fit_predict(
+            rfm_scaled
+        )
+
+        cluster_summary = (
+            rfm.groupby("cluster")
+            .agg({
+                "Recency": "mean",
+                "Frequency": "mean",
+                "Monetary": "mean"
+            })
+        )
+
+        print(cluster_summary)
